@@ -63,6 +63,75 @@ const routes = {
       },
     });
   },
+  "/dashboard": async function (request, requestURL) {
+    return new Response(
+      '<!DOCTYPE html><html><head><title>Your Files</title><style>*{box-sizing:border-box}html,body{background-color:#1e1e1e;font-family:sans-serif;color:#d4d4d4;width:100%;height:100%;margin:0;padding:0}h1{padding-top:15px;margin:0;text-align:center}ul{list-style-type:none;display:flex;flex-wrap:wrap;padding:0 0 0 0px;justify-content:center}li{padding:12px 6px 0px;transition:opacity 500ms ease-out}figure{border:thin #c0c0c0 solid;display:flex;flex-flow:column;padding:5px;width:220px;height:200px;margin:auto;opacity:1}img{width:100%;height:100%;object-fit:contain;background-color:black}form{text-align:center}figcaption{background-color:#4752c4;color:#fff;font:italic smaller sans-serif;padding:3px;text-align:center}figure button{background-color:#ed4245}button{border:0;background-color:#4752c4;height:25px;color:rgb(255, 255, 255);text-align:center;transition:all 200ms ease-out}figure button:hover{background-color:#dd1c1f}.collapse{opacity:0}@media only screen and (max-width: 700px){li,figure{width:100%}.expanded{padding:0px !important}}.expanded{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1002;animation:pop 200ms ease;padding:4%}</style> <script>window.addEventListener("DOMContentLoaded",(event)=>{const upkey=prompt("Enter key to view dashboard.");const ul=document.querySelector("ul");const template=document.getElementById("listItemTemplate");let cursor;async function loadItems(){const req=await fetch("/dashboard/list",{headers:{authorization:upkey}});const res=await req.json();const frag=document.createDocumentFragment();for(const key of res.keys){const clone=template.content.cloneNode(true);const li=clone.querySelector("li");const img=li.querySelector("img");const figcaption=li.querySelector("figcaption");const button=li.querySelector("button");img.src=`/${key.name}.${key.metadata.ext}`;figcaption.textContent=`${key.name}.${key.metadata.ext}`;li.setAttribute("data-key",key.name);button.setAttribute("data-key",key.name);frag.appendChild(li);} ul.appendChild(frag);} loadItems();ul.addEventListener("click",(e)=>{if(e.target.matches("li figure button")){const parent=document.querySelector(`li[data-key="${e.target.attributes["data-key"].value}"]`);parent.classList.toggle("collapse");parent.addEventListener("transitionend",async()=>{const req=await fetch(`/dashboard/delete?key=${e.target.attributes["data-key"].value}`,{method:"POST",headers:{authorization:upkey}});const res=await req.json();if(res.ok==="yeah")parent.remove();else parent.classList.toggle("collapse");},{once:true});} if(e.target.matches("li figure img")){e.target.classList.toggle("expanded");}});},{once:true});</script> </head> <header><h1>Your Files</h1> </header><body> <main><ul></ul> </main> <template id="listItemTemplate"><li> <figure> <img /> <figcaption></figcaption> <button>delete</button> </figure></li> </template></body></html>',
+      {
+        status: 200,
+        headers: {
+          "content-type": "text/html;charset=UTF-8",
+          ...corsHeaders,
+        },
+      }
+    );
+  },
+  "/dashboard/list": async function (request, requestURL) { 
+    const authKey = request.headers.get("authorization");
+    if (authKey !== UPLOAD_KEY) {
+      return new Response("Invalid Credentials", {
+        status: 403,
+        headers: {
+          "content-type": "text/plain;charset=UTF-8",
+          ...corsHeaders,
+        },
+      });
+    } else {
+      const cursor = requestURL.searchParams.get("cursor") || null;
+      const limit = requestURL.searchParams.get("limit") || 100;
+
+      const list = await db.list({ cursor, limit });
+
+      return new Response(JSON.stringify(list), {
+        status: 200,
+        headers: {
+          "content-type": "application/json;charset=UTF-8",
+          ...corsHeaders,
+        },
+      });
+    }
+  },
+  "/dashboard/delete": async function (request, requestURL) {
+    const authKey = request.headers.get("authorization");
+    if (authKey !== UPLOAD_KEY) {
+      return new Response("Invalid Credentials", {
+        status: 403,
+        headers: {
+          "content-type": "text/plain;charset=UTF-8",
+          ...corsHeaders,
+        },
+      });
+    } else if (request.method !== "POST") {
+      return new Response("Invalid", {
+        status: 403,
+        headers: {
+          "content-type": "text/plain;charset=UTF-8",
+          ...corsHeaders,
+        },
+      });
+    } else {
+      const key = requestURL.searchParams.get("key");
+
+      await db.delete(key);
+
+      return new Response(`{"ok":"yeah"}`, {
+        status: 200,
+        headers: {
+          "content-type": "application/json;charset=UTF-8",
+          ...corsHeaders,
+        },
+      });
+    }
+  },
 };
 
 async function handleRequest(request) {
@@ -120,26 +189,3 @@ function nanoid(t=21){let n="",r=crypto.getRandomValues(new Uint8Array(t));for(;
 addEventListener("fetch", (event) => {
   event.respondWith(handleRequest(event.request));
 });
-
-
-// // nanoid license
-// The MIT License (MIT)
-
-// Copyright 2017 Andrey Sitnik <andrey@sitnik.ru>
-
-// Permission is hereby granted, free of charge, to any person obtaining a copy of
-// this software and associated documentation files (the "Software"), to deal in
-// the Software without restriction, including without limitation the rights to
-// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-// the Software, and to permit persons to whom the Software is furnished to do so,
-// subject to the following conditions:
-
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-// FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-// COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-// IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-// CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
