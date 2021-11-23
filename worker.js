@@ -1,6 +1,7 @@
 // figure out the defaults - if the defaults aren't set, assume one week.
 const expirationTtl = weeksToSeconds(DEFAULT_EXPIRATION || 1);
-const DEFAULT_ERROR_MESSAGE = "<title>404 Not Found</title><h1>Not Found</h1><p>The requested URL was not found on this server.<hr><address>Apache/2.2.22 (Linux) Server at Port 80</address>";
+
+const index = `<!DOCTYPE html><html><head> <title>UnholyRazzberry</title> <link href="./style.css" rel="stylesheet"> <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" integrity="sha512-1ycn6IcaQQ40/MKBW2W4Rhis/DbILU74C1vSrLJxCq57o941Ym01SwNsOMqvEBFlcgUa6xLiPY/NS5R+E6ztJQ==" crossorigin="anonymous" referrerpolicy="no-referrer"/> <link rel="preconnect" href="https://fonts.googleapis.com"> <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet"> <style>body,html{margin:0;padding:0}body{text-align:center;background-color:#160f30;font-family:"Bebas Neue",sans-serif;color:#fff}.razz-avatar{border-radius:50%;height:128px;width:128px}.center{display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;min-height:100vh}.username{letter-spacing:.05em}.discrim{font-size:.6em}.plugs a{margin-right:9px;color:#fff;text-decoration:none;font-size:1.7em}.plugs a:hover{color:violet}</style></head><body> <div class="center"> <img class="razz-avatar" src="https://cdn.discordapp.com/avatars/461306748578430976/28c27e50cfc2e4c1d15ec5be14ca0661.webp?size=128"> <h1 class="username"> UnholyRazzberry<span class="discrim">#8555</span> </h1> <p class="plugs"> <a href="http://discord.gg/nightcore" alt="Discord" target="_blank"> <i class="fab fa-discord"></i> </a> <a href="https://www.youtube.com/channel/UCksMwRtNoXBUUQ8fgtHtkGw" alt="Youtube" target="_blank"> <i class="fab fa-youtube"></i> </a> <a href="https://www.reddit.com/user/AnimeHeadphoneRetard" alt="Reddit" target="_blank"> <i class="fab fa-reddit-alien"></i> </a> <a href="https://steamcommunity.com/id/UnholyRazzberry" alt="Steam" target="_blank"> <i class="fab fa-steam"></i> </a> <a href="https://soundcloud.com/unholyrazzberry" alt="SoundCloud" target="_blank"> <i class="fab fa-soundcloud"></i> </a> <a href="javascript:void(0)" onclick="alert('CubisticBooch51')" alt="Xbox"> <i class="fab fa-xbox"></i> </a> </p></div></body></html>`
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,6 +10,15 @@ const corsHeaders = {
 };
 
 const routes = {
+  "/index.html": async function(request, requestURL) {
+    return new Response(index, {
+      status: 200,
+      headers: {
+        "content-type": "text/html;charset=UTF-8",
+        ...corsHeaders,
+      },
+    });
+  },
   "/upload": async function (request, requestURL) {
     const authKey = request.headers.get("authorization");
     if (authKey !== UPLOAD_KEY) {
@@ -139,16 +149,25 @@ async function handleRequest(request) {
 
   const fileKey = removeFileExtension(requestURL.pathname.replace("/", ""));
 
-  if (!fileKey)
-    return new Response(DEFAULT_ERROR_MESSAGE, {
-      status: 404,
+  if (requestURL.pathname === "/") {
+      requestURL.pathname = "/index.html";
+  }
+  if (routes[requestURL.pathname]) {
+    return await routes[requestURL.pathname](request, requestURL);
+  }
+
+  let file;
+  try {
+    file = await db.getWithMetadata(fileKey, { type: "stream" });
+  } catch (err) {
+    return new Response("500 Internal Server Error", {
+      status: 500,
       headers: {
-        "content-type": "text/html;charset=UTF-8",
+        "content-type": "text/plain",
         ...corsHeaders,
       },
     });
-
-  const file = await db.getWithMetadata(fileKey, { type: "stream" });
+  }
 
   if (file.value) {
     return new Response(file.value, {
@@ -158,13 +177,11 @@ async function handleRequest(request) {
         ...corsHeaders,
       },
     });
-  } else if (routes[requestURL.pathname]) {
-    return await routes[requestURL.pathname](request, requestURL);
   } else {
-    return new Response(DEFAULT_ERROR_MESSAGE, {
+    return new Response("404 Not Found", {
       status: 404,
       headers: {
-        "content-type": "text/html;charset=UTF-8",
+        "content-type": "text/plain",
         ...corsHeaders,
       },
     });
